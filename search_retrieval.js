@@ -17,7 +17,7 @@ db.cookies.find({ category: { $in: ['Seasonal', 'Vegan'] } }).limit(5).forEach(c
 // Find cookies with calories between 200 and 300
 // Sort the results by calories in ascending order
 // Print the name and nutritional info of each cookie
-const cookiesInRange = db.cookies.find({ "nutritionalInfo.calories": { $gt: 200, $lt: 300 } }).sort({ "nutritionalInfo.calories": 1 }).toArray();
+const cookiesInRange = db.cookies.find({ "nutritionalInfo.calories": { $gte: 200, $lte: 300 } }).sort({ "nutritionalInfo.calories": 1 }).toArray();
 print(`Number of cookies with calories between 200 and 300: ${cookiesInRange.length}`);
 cookiesInRange.forEach(cookie => { // Iterate over each document
     print(`Name: ${cookie.name}, Calories: ${cookie.nutritionalInfo.calories}`); // Print name and nutritional info of each cookie
@@ -60,6 +60,13 @@ db.customers.find({
 }, { email: 1, _id: 0 });
 
 /////////////////////////////////////////Orders/////////////////////////
+
+//Find how many orders so far
+db.orders.find().count()
+
+//Find all orders except for the first one ever made
+db.orders.find().sort({orderDate:1}).skip(1)
+
 //Find orders with a quantity greater than 3 and special instructions that are not empty:
 db.orders.find({
     "details.quantity": { $gt: 3 }, // Find orders with a quantity greater than 3
