@@ -1,16 +1,8 @@
 //Elad Armoni 206157323
 //Ofek Begerano 318435195
 
-///////////////////################################################## Part A ###################################################################///////////////////////////
-/////************** 1 ****************/////
 //This script is building a database for a cookie store using MongoDB, defining three collections: 
 //"cookies," "customers," and "orders."
-
-//The database design incorporates a combination of Embedded and Referenced data modeling to optimize system performance.
-//By using Embedded, we allow saving data that is not required for direct external access together with the main document,
-//which can reduce the database access load and improve system performance.
-//On the other hand, by using Referenced, we enable links between documents in an efficient and clear way,
-//which makes data management and calls to the database easier.
 
 //Cookies Collection:
 //The script generates 400 unique cookies by combining different types and tastes, creating a unique name for each cookie.
@@ -25,7 +17,14 @@
 //Each order includes a customer ID, details of the ordered cookies (with random quantities), special instructions, and a promo code.
 //Helper functions are used to randomly select cookie IDs and customer IDs.
 
+///////////////////################################################## Part A ###################################################################///////////////////////////
+/////************** 1 ****************/////
 //Data Modeling Approach:
+//The database design incorporates a combination of Embedded and Referenced data modeling to optimize system performance.
+//By using Embedded, we allow saving data that is not required for direct external access together with the main document,
+//which can reduce the database access load and improve system performance.
+//On the other hand, by using Referenced, we enable links between documents in an efficient and clear way,
+//which makes data management and calls to the database easier.
 //Embedded data modeling is utilized for certain fields, such as ingredients for cookies, addresses for customers, and details of ordered cookies within an order document.
 //Referenced data modeling is used for relationships between different collections, like linking customer IDs in orders.
 
@@ -89,7 +88,7 @@ const tastes = [
   "with Cream Cheese Frosting", "with Cheesecake Pieces", "with Matcha Powder", "Gluten-Free"
 ];
 
-// Inserting 400 unique cookies by combining each type with each taste
+// Inserting 400 unique cookies by combining each type(20 types) with each taste(20 tastes)
 cookieTypes.forEach(type => {
   tastes.forEach(taste => {
     const cookieName = `${type} ${taste}`; // Combining type and taste for a unique name
@@ -102,7 +101,7 @@ cookieTypes.forEach(type => {
       nutritionalInfo: generateNutritionalInfo(),
     };
 
-    // Conditionally add ingredients
+    // Conditionally add ingredients - for flexible and different documents
     if (includeIngredients) {
       cookieDocument.ingredients = generateIngredients(type);
     }
@@ -112,25 +111,27 @@ cookieTypes.forEach(type => {
 });
 
 //////CUSTOMERS///////
-// Helper functions for generating customer data
+// Helper function for generating customer name
 function generateCustomerName() {
   const names = ["Alex", "Jordan", "Taylor", "Casey", "Morgan", "Skyler", "Jamie", "Robin", "Dakota", "Cameron"];
   return names[Math.floor(Math.random() * names.length)];
 }
 
+// Helper function for generating customer email
 function generateEmail(name) {
   const domains = ["@example.com", "@mail.com", "@web.com"];
   return name.toLowerCase() + Math.floor(Math.random() * 100) + domains[Math.floor(Math.random() * domains.length)];
 }
 
+// Helper function for generating customer address
 function generateAddresses() {
   const streets = ["Main St", "Second St", "Third St", "Fourth St", "Fifth St"];
   const cities = ["Anytown", "Springfield", "Greenville", "Fairview", "Midtown"];
   const states = ["CA", "NY", "TX", "FL", "NV"];
 
+  //Embedded addresses
   const numberOfAddresses = Math.floor(Math.random() * 3) + 1; // 1 to 3 addresses
   const addresses = [];
-
   for (let i = 0; i < numberOfAddresses; i++) {
     addresses.push({
       street: Math.floor(Math.random() * 1000) + " " + streets[Math.floor(Math.random() * streets.length)],
@@ -138,16 +139,16 @@ function generateAddresses() {
       state: states[Math.floor(Math.random() * states.length)]
     });
   }
-
   return addresses;
 }
 
+// Helper function for generating customer cookies preferences
 function generatePreferences() {
   const preferences = ["Classic", "Vegan", "Gluten-Free", "Seasonal", "Premium"];
   return preferences.filter(() => Math.random() > 0.5);
 }
 
-// Insert 100 customers with mixed data modeling
+// Inserting 100 customers with mixed data modeling
 for (let i = 0; i < 100; i++) {
   const name = generateCustomerName();
   db.customers.insertOne({
@@ -170,8 +171,9 @@ async function getRandomCustomerId() {
   return customer[0]._id;
 }
 
-function generateOrderDetails(cookieIds) {
-  return cookieIds.map(cookieId => ({
+async function generateOrderDetails(cookieIds) {
+  const resolvedCookieIds = await cookieIds; // Await the resolution of cookieIds
+  return resolvedCookieIds.map(cookieId => ({
     cookieId: cookieId,
     quantity: Math.floor(Math.random() * 5) + 1 // 1 to 5 cookies of each type
   }));
@@ -187,30 +189,41 @@ function getRandomDate(start, end) {
   return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
 }
 
-// Insert orders with mixed data modeling
+// Inserting 200 orders with mixed data modeling
+// Define the range for random dates (e.g., past year)
+
 (async () => {
-  // Define the range for random dates (e.g., past year)
   const startDate = new Date();
   startDate.setFullYear(startDate.getFullYear() - 1); // One year ago
   const endDate = new Date(); // Current date
-
   for (let i = 0; i < 200; i++) {
     const cookieIds = await getRandomCookieIds();
     const customerId = await getRandomCustomerId();
     const orderDate = getRandomDate(startDate, endDate); // Get a random date within the defined range
 
+    let promoCode = Math.random() > 0.8 ? "DISCOUNT10" : null;
+    if (promoCode === "") {
+      promoCode = null; // Set promoCode to null if it's an empty string
+    }
+
+    let specialInstructions = generateSpecialInstructions();
+    if (specialInstructions === "") {
+      specialInstructions = null; // Set specialInstructions to null if it's an empty string
+    }
+
     db.orders.insertOne({
       customerId: customerId,
-      details: generateOrderDetails(cookieIds),
-      specialInstructions: generateSpecialInstructions(),
-      promoCode: Math.random() > 0.8 ? "DISCOUNT10" : "", // 20% chance to apply a promo code
+      details: await generateOrderDetails(cookieIds),
+      ...(specialInstructions !== null && { specialInstructions }), // Include specialInstructions only if it's not null
+      ...(promoCode !== null && { promoCode }), // Include promoCode only if it's not null
       orderDate: orderDate // Add the random order date
     });
   }
 })();
 
+
 /////************** 3 ****************/////
-//We used JSON code in functions on the other questions (2,4,5,6,7).
+//We used JSON code in functions on the other solutions.
 
 /////************** 4 ****************/////
 ////////COOKIES////////////
@@ -219,14 +232,14 @@ function getRandomDate(start, end) {
 // Limit the results to 10 documents
 // Print the name and price of each cookie
 db.cookies.find({ price: { $gt: 4.97 } }).sort({ price: -1 }).limit(10).forEach(cookie => {
-    print(`Name: ${cookie.name}, Price: ${cookie.price}`);
+  print(`Name: ${cookie.name}, Price: ${cookie.price}`);
 });
 
 // Find cookies with the Seasonal or Vegan category
 // Limit the results to 5 documents
 // Print the name and category of each cookie
 db.cookies.find({ category: { $in: ['Seasonal', 'Vegan'] } }).limit(5).forEach(cookie => { // Iterate over each document
-    print(`Name: ${cookie.name}, Category: ${cookie.category}`); // Print name and type of each cookie
+  print(`Name: ${cookie.name}, Category: ${cookie.category}`); // Print name and type of each cookie
 });
 
 // Find cookies with calories between 200 and 300
@@ -235,43 +248,49 @@ db.cookies.find({ category: { $in: ['Seasonal', 'Vegan'] } }).limit(5).forEach(c
 const cookiesInRange = db.cookies.find({ "nutritionalInfo.calories": { $gte: 200, $lte: 300 } }).sort({ "nutritionalInfo.calories": 1 }).toArray();
 print(`Number of cookies with calories between 200 and 300: ${cookiesInRange.length}`);
 cookiesInRange.forEach(cookie => { // Iterate over each document
-    print(`Name: ${cookie.name}, Calories: ${cookie.nutritionalInfo.calories}`); // Print name and nutritional info of each cookie
+  print(`Name: ${cookie.name}, Calories: ${cookie.nutritionalInfo.calories}`); // Print name and nutritional info of each cookie
 });
 
 // Find cookies with names containing the letter "r" or "o" and prices greater than $3, and are Vegan
 // Sort the results by price in descending order
 // Limit the results to 10 documents
 db.cookies.find({
-    $or: [{ name: /r/ }, { name: /o/ }],
-    price: { $gt: 3 },
-    category: "Vegan"
+  $or: [{ name: /r/ }, { name: /o/ }],
+  price: { $gt: 3 },
+  category: "Vegan"
 }).sort({ price: -1 }).limit(10);
 
 ////////Customers//////////
 // Find customers who prefer either Classic or Vegan cookies and live in California or New York
 db.customers.find({
-    $or: [
+  $and: [
+    {
+      $or: [
         { preferences: "Classic" },
         { preferences: "Vegan" }
-    ],
-    $or: [
+      ]
+    },
+    {
+      $or: [
         { "addresses.state": "CA" },
         { "addresses.state": "NY" }
-    ]
+      ]
+    }
+  ]
 });
 
 // Find customers who prefer Classic cookies and have addresses in both California and New York,
 // but do not live in a city called "Anytown"
 db.customers.find({
-    preferences: "Classic",
-    "addresses.state": { $all: ["CA", "NY"] },
-    "addresses.city": { $nin: ["Anytown"] }
+  preferences: "Classic",
+  "addresses.state": { $all: ["CA", "NY"] },
+  "addresses.city": { $nin: ["Anytown"] }
 });
 
 // Find customers emails whose name starts with "C" and live in the state of "NV"
 db.customers.find({
-    name: /^C/i, // Use a regular expression to match names starting with "C" (case-insensitive)
-    "addresses.state": "NV" // Match customers who live in the state of "NV"
+  name: /^C/i, // Use a regular expression to match names starting with "C" (case-insensitive)
+  "addresses.state": "NV" // Match customers who live in the state of "NV"
 }, { email: 1, _id: 0 });
 
 ///////Orders///////
@@ -279,17 +298,17 @@ db.customers.find({
 db.orders.find().count()
 
 //Find all orders except for the first one ever made
-db.orders.find().sort({orderDate:1}).skip(1)
+db.orders.find().sort({ orderDate: 1 }).skip(1)
 
-//Find orders with a quantity greater than 3 and special instructions that are not empty:
+//Find orders with a quantity greater than 3 for some cookie and special instructions that are not empty:
 db.orders.find({
-    "details.quantity": { $gt: 3 }, // Find orders with a quantity greater than 3
-    specialInstructions: { $ne: "" } // Find orders with non-empty special instructions
+  "details.quantity": { $gt: 3 }, // Find orders with a quantity greater than 3 for some cookie
+  specialInstructions: { $exists: true } // Find orders with special instructions
 });
 
 //Find orders with a promo code applied and sort them by customer ID in ascending order
 db.orders.find({
-    promoCode: { $exists: true, $ne: "" } // Find orders with a promo code applied
+  promoCode: { $exists: true } // Find orders with a promo code applied
 }).sort({ customerId: 1 });
 
 //find all orders placed in the last week
@@ -298,30 +317,58 @@ oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 db.orders.find({ orderDate: { $gte: oneWeekAgo } });
 
 // Find orders with a promo code applied and a total price greater than $50
-db.orders.find({ promoCode: { $exists: true, $ne: "" } }).forEach(order => {
-    let totalPrice = 0;
-    order.details.forEach(detail => {
-        const cookie = db.cookies.findOne({ _id: detail.cookieId }); // Fetch the cookie details by its ID
-        totalPrice += detail.quantity * cookie.price; // Calculate the total price for each order
-    });
-    if (totalPrice > 50) { // Check if the total price exceeds $50
-        printjson(order); // Print the order details
-    }
+db.orders.find({ promoCode: { $exists: true } }).forEach(order => {
+  let totalPrice = 0;
+  order.details.forEach(detail => {
+    const cookie = db.cookies.findOne({ _id: detail.cookieId }); // Fetch the cookie details by its ID
+    totalPrice += detail.quantity * cookie.price; // Calculate the total price for each order
+  });
+  if (totalPrice > 50) { // Check if the total price exceeds $50
+    printjson(order); // Print the order details
+  }
 });
 
 /////************** 5 ****************/////
 ///////COOKIES////////
-// Update One: Remove the last ingredient from cookies with the "Classic" category
+// updateMany: Remove the last ingredient from cookies with the "Classic" category
 db.cookies.updateMany(
-    { category: "Classic" },
-    { $pop: { ingredients: 1 } }
+  { category: "Classic" },
+  { $pop: { ingredients: 1 } }
+);
+
+//Update Many: Add a new ingredient to all cookies with the "Premium" category:
+db.cookies.updateMany(
+  { category: "Premium" },
+  { $push: { ingredients: "Gold Flakes" } }
 );
 
 // Remove: Delete a specific cookie
 db.cookies.remove(
-    { name: "Peanut Butter with Sea Salt" }
+  { name: "Peanut Butter with Sea Salt" }
 );
 
+//Remove: Delete all orders placed by customers with no email address:
+const customersWithoutEmail = db.customers.find({ email: "" }, { _id: 1 }).toArray();
+const customerIdsWithoutEmail = customersWithoutEmail.map(customer => customer._id);
+db.orders.deleteMany({ customerId: { $in: customerIdsWithoutEmail } });
+
+//Remove: Delete orders placed more than 6 months ago:
+const sixMonthsAgo = new Date();
+sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+db.orders.deleteMany({ orderDate: { $lte: sixMonthsAgo } });
+
+//Update Many: Increase the quantity of all cookies in orders by 1:
+db.orders.updateMany(
+  {},
+  { $inc: { "details.$[].quantity": 1 } }
+);
+
+//Update One: Add a new address to a specific customer's address array if it doesn't already exist:
+const newAddress = { street: "123 Main St", city: "New York", state: "NY", zip: "10001" };
+db.customers.updateOne(
+  { name: 'Jamie', },
+  { $addToSet: { addresses: newAddress } }
+);
 
 // Rename: Rename the "cookies" collection to "biscuits"
 db.cookies.renameCollection("biscuits");
@@ -331,16 +378,13 @@ db.biscuits.renameCollection("cookies");
 ///////CUSTOMERS////////
 // Remove: Delete a specific customer
 db.customers.remove(
-    { name: "Taylor" }
+  { name: "Taylor" }
 );
 
 // Remove: Delete all customers with no email addresses
 db.customers.remove(
-    { email: "" }
+  { email: "" }
 );
-
-// Drop: Drop the "customers" collection
-// db.clients.drop();
 
 //Create collection of active customers (that did orders) add how many orders and total cookies
 //if we want to update already active customers dont run next 2 lines
@@ -348,25 +392,24 @@ db.active_customers.drop()
 db.createCollection("active_customers")
 
 db.customers.find().forEach(customer => {
-    let howManyCookies=0
-    const howManyOrders=db.orders.find({customerId:customer._id}).count()
-    if(howManyOrders>0){
-        db.orders.find({customerId:customer._id}).forEach((order)=>order.details.forEach(orderDetail=>howManyCookies+=orderDetail.quantity))
-        if(db.active_customers.find({customerId:customer._id}).count()>0)//should update collection with latest details if customer was already active
-        {
-            db.active_customers.updateOne({customerId:customer._id},{$set:{ordersNum:howManyOrders,totalCookies:howManyCookies}})
-        }
-        else{
-            db.active_customers.insertOne({
-                customerId:customer._id,
-                customerName:customer.name,
-                customerEmail:customer.email,
-                ordersNum:howManyOrders,
-                totalCookies:howManyCookies
-            })
-        }
-        
+  let howManyCookies = 0
+  const howManyOrders = db.orders.find({ customerId: customer._id }).count()
+  if (howManyOrders > 0) {
+    db.orders.find({ customerId: customer._id }).forEach((order) => order.details.forEach(orderDetail => howManyCookies += orderDetail.quantity))
+    if (db.active_customers.find({ customerId: customer._id }).count() > 0)//should update collection with latest details if customer was already active
+    {
+      db.active_customers.updateOne({ customerId: customer._id }, { $set: { ordersNum: howManyOrders, totalCookies: howManyCookies } })
     }
+    else {
+      db.active_customers.insertOne({
+        customerId: customer._id,
+        customerName: customer.name,
+        customerEmail: customer.email,
+        ordersNum: howManyOrders,
+        totalCookies: howManyCookies
+      })
+    }
+  }
 })
 db.active_customers.find().pretty()
 
@@ -376,35 +419,29 @@ db.orders_bck.drop()
 db.createCollection("orders_bck")
 const oneMonthAgo = new Date();
 oneMonthAgo.setDate(oneMonthAgo.getDate() - 30);
-db.orders.find({ orderDate: { $lte: oneMonthAgo } }).forEach( function(docs){db.orders_bck.insertOne(docs);} ) 
+db.orders.find({ orderDate: { $lte: oneMonthAgo } }).forEach(function (docs) { db.orders_bck.insertOne(docs); })
 //Find how many old orders are there
 db.orders_bck.find().count()
 //Find how many orders are there
 db.orders.find().count()
 //Find the difference - how many orders in the last month
-db.orders.find().count()-db.orders_bck.find().count()
+db.orders.find().count() - db.orders_bck.find().count()
 
 // Update One: Remove the "DISCOUNT10" promo code from orders with a specific customer ID
 db.orders.updateOne(
-    { customerId: ObjectId("65d6284103b7b7982a1e7a1e") },
-    { $unset: { promoCode: "" } }
+  { customerId: ObjectId("65d6284103b7b7982a1e7a1e") },
+  { $unset: { promoCode: "" } }
 );
 
 // Remove: Delete a specific order
 db.orders.remove(
-    { _id: ObjectId("65d6284803b7b7982a1e7acc") }
+  { _id: ObjectId("65d6284803b7b7982a1e7acc") }
 );
 
 // Remove: Delete all orders with no details
 db.orders.remove(
-    { details: { $exists: false } }
+  { details: { $exists: false } }
 );
-
-// Rename: Rename the "orders" collection to "transactions"
-// db.orders.renameCollection("transactions");
-
-// Drop: Drop the "orders" collection
-// db.transactions.drop();
 
 ///////////////////################################################## Part B ###################################################################///////////////////////////
 /////************** 6 ****************/////
@@ -511,6 +548,8 @@ db.orders.aggregate([
       },
     },
   },
+  // Store the results in a new collection called "total_nutritional_info_per_order"
+  { $out: "total_nutritional_info_per_order" }
 ]);
 
 //Active Customers with Most Orders
@@ -535,6 +574,8 @@ db.orders.aggregate([
   },
   { $unwind: "$customerDetails" },
   { $project: { customerName: "$customerDetails.name", totalOrders: 1 } },
+  // Store the results in a new collection called "active_customers_most_orders"
+  { $out: "active_customers_most_orders" }
 ]);
 
 /////************** 7 ****************/////
