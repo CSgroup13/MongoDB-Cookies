@@ -49,6 +49,7 @@ db.orders.aggregate([
   { $unwind: "$cookieDetails" },
   { $project: { cookieName: "$cookieDetails.name", totalQuantity: 1 } },
 ]);
+
 //Customer Preferences Analysis
 //Analyzes customer preferences to see which cookie categories are most preferred.
 //It groups customers by their preferences and counts how many customers prefer each category.
