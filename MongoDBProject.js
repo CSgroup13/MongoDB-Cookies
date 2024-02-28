@@ -579,4 +579,73 @@ db.orders.aggregate([
 ]);
 
 /////************** 7 ****************/////
+//Total Sales Revenue per Cookie Category
+db.orders.mapReduce(
+  function () {
+    this.details.forEach(function (detail) {
+      emit(detail.cookieId, detail.quantity);
+    });
+  },
+  function (key, values) {
+    return Array.sum(values);
+  },
+  {
+    out: "TotalSalesPerCookie",
+    query: { "details.cookieId": { $exists: true } }
+  }
+);
+
+//Most Popular Cookies Based on Orders
+db.orders.mapReduce(
+  function () {
+    this.details.forEach(function (detail) {
+      emit(detail.cookieId, detail.quantity);
+    });
+  },
+  function (key, values) {
+    return Array.sum(values);
+  },
+  {
+    out: "TotalQuantityPerCookie",
+    query: { "details.cookieId": { $exists: true } }
+  }
+);
+
+db.TotalQuantityPerCookie.find().sort({ value: -1 }).limit(5);
+
+//Customer Preferences Analysis
+db.customers.mapReduce(
+  function () {
+    this.preferences.forEach(function (preference) {
+      emit(preference, 1);
+    });
+  },
+  function (key, values) {
+    return Array.sum(values);
+  },
+  { out: "CustomerPreferences" }
+);
+
+//Active Customers with Most Orders
+db.orders.mapReduce(
+  function () {
+    emit(this.customerId, 1);
+  },
+  function (key, values) {
+    return Array.sum(values);
+  },
+  {
+    out: "TotalOrdersPerCustomer",
+    query: { customerId: { $exists: true } }
+  }
+);
+
+db.TotalOrdersPerCustomer.find().sort({ value: -1 });
+
+
+
+
+
+
+
 
