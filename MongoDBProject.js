@@ -31,6 +31,8 @@
 /////************** 2 ****************/////
 ////////Establishing The DB//////////
 use cookieStore;
+db.dropDatabase();
+use cookieStore;
 
 // Create the "cookies" collection
 db.createCollection("cookies")
@@ -578,6 +580,47 @@ db.orders.aggregate([
   { $out: "active_customers_most_orders" }
 ]);
 
+//add to all orders their Total price
+let orderPrices = db.orders.aggregate([
+  // Assuming you have a way to reference the correct cookies and their prices
+  // This step is highly dependent on your data model
+  {
+    $lookup: {
+      from: "cookies",
+      localField: "details.cookieId",
+      foreignField: "_id", // Adjust the localField and foreignField as necessary
+      as: "cookieDetails"
+    }
+  },
+  {
+    $unwind: "$details"
+  },
+  {
+    $unwind: "$cookieDetails"
+  },
+  // Ensure matching of cookies to their details; you might need additional logic here
+  {
+    $project: {
+      _id: 1,
+      totalPrice: {
+        $multiply: ["$details.quantity", "$cookieDetails.price"]
+      }
+    }
+  },
+  {
+    $group: {
+      _id: "$_id",
+      totalPrice: { $sum: "$totalPrice" }
+    }
+  }
+]);
+orderPrices.forEach(result => {
+  db.orders.updateOne(
+    { _id: result._id },
+    { $set: { totalPrice: result.totalPrice } }
+  );
+});
+
 /////************** 7 ****************/////
 //Total Sales Revenue per Cookie Category
 db.orders.mapReduce(
@@ -640,12 +683,60 @@ db.orders.mapReduce(
   }
 );
 
-db.TotalOrdersPerCustomer.find().sort({ value: -1 });
+const totalOrdersPerCustomer =db.TotalOrdersPerCustomer.find().sort({ value: -1 })
+totalOrdersPerCustomer.forEach((orderRecord) => {
+  const customerDetails = db.customers.findOne({ _id: orderRecord._id });
+   if(customerDetails){
+      print(`${customerDetails.name} ordered ${orderRecord.value} times`)
+  }
+});
 
 
+var mapFunction = function() {
+  emit(this.customerId, { sumPrice: this.totalPrice, count: 1 });
+};
+var reduceFunction = function(key, values) {
+  var reducedVal = { sumPrice: 0, count: 0 };
 
+  for (var i = 0; i < values.length; i++) {
+      reducedVal.sumPrice += values[i].sumPrice;
+      reducedVal.count += values[i].count;
+  }
 
-
-
-
-
+  return reducedVal;
+};
+var finalizeFunction = function(key, reducedVal) {
+  reducedVal.avgPrice = reducedVal.sumPrice / reducedVal.count;
+  return reducedVal;
+};
+db.orders.mapReduce(
+  mapFunction,
+  reduceFunction,
+  {
+      out: "averageOrderTotalPricePerCustomer",
+      finalize: finalizeFunction
+  }
+);
+//showing customers details with avg price for order
+db.averageOrderTotalPricePerCustomer.aggregate([
+  {
+      $lookup: {
+          from: "customers", 
+          localField: "_id", 
+          foreignField: "_id", 
+          as: "customerDetails" 
+      }
+  },
+  {
+      $unwind: "$customerDetails" 
+  },
+  {
+      $project: {
+          _id: 0, 
+          customerName: "$customerDetails.name", 
+          customerEmail: "$customerDetails.email", 
+          avgPrice: "$value.avgPrice", 
+          
+      }
+  }
+]);
