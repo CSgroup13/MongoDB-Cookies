@@ -342,6 +342,12 @@ db.cookies.updateMany(
   { $push: { ingredients: "Gold Flakes" } }
 );
 
+// Update Many: Remove "walnuts" from the ingredients array of cookies with the "Classic" category
+db.cookies.updateMany(
+  { category: "Classic" }, // Match documents with the "Classic" category
+  { $pull: { ingredients: "walnuts" } } // Pull (remove) "walnuts" from the ingredients array
+);
+
 // Remove: Delete a specific cookie
 db.cookies.remove(
   { name: "Peanut Butter with Sea Salt" }
