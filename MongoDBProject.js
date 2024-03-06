@@ -746,3 +746,62 @@ db.averageOrderTotalPricePerCustomer.aggregate([
       }
   }
 ]);
+
+
+//Complex mapReduce function
+//a mapReduce function on the new collection to calculate the average order value per customer.
+// Step 1: Perform a lookup to join orders with customers
+db.orders.aggregate([
+  {
+    $lookup: {
+      from: "customers", // The foreign collection
+      localField: "customerId", // Field from the input documents
+      foreignField: "_id", // Field from the documents of the "from" collection
+      as: "customerDetails" // The name for the result array
+    }
+  },
+  // Step 2: Output the result to a new collection
+  {
+    $out: "ordersWithCustomerDetails"
+  }
+]);
+
+// Step 3: Execute a mapReduce function on the new collection
+var mapFunction = function() {
+  var customerId = this.customerDetails.length > 0 ? this.customerDetails[0]._id : null;
+  if (customerId) {
+    emit(customerId, { orderTotal: this.totalPrice, count: 1 });
+  }
+};
+
+var reduceFunction = function(keyCustomerId, values) {
+  var reducedValue = { orderTotal: 0, count: 0 };
+
+  for (var index = 0; index < values.length; index++) {
+    reducedValue.orderTotal += values[index].orderTotal;
+    reducedValue.count += values[index].count;
+  }
+
+  return reducedValue;
+};
+
+var finalizeFunction = function(key, reducedValue) {
+  if (reducedValue.count > 0) {
+    reducedValue.avgOrderValue = reducedValue.orderTotal / reducedValue.count;
+  } else {
+    reducedValue.avgOrderValue = 0;
+  }
+  return reducedValue;
+};
+
+db.ordersWithCustomerDetails.mapReduce(
+  mapFunction,
+  reduceFunction,
+  {
+    out: "averageOrderValuePerCustomer",
+    finalize: finalizeFunction
+  }
+);
+
+// Display the result
+db.averageOrderValuePerCustomer.find().pretty();
